@@ -169,6 +169,10 @@ bool sm_init(void){
 			WRITE_LONGDOC, WRITE_COMPLETE);
 	sm_registercommand("option", handler__option, vars->commands, OPTION_SHRTDOC,
 			OPTION_LONGDOC, OPTION_COMPLETE);
+	sm_registercommand("create_pointer_map", handler__create_pointer_map, vars->commands, NULL,
+			NULL, NULL);
+	sm_registercommand("scan_pointer_chain", handler__scan_pointer_chain, vars->commands, NULL,
+			NULL, NULL);
 	/* commands beginning with __ have special meaning */
 	sm_registercommand("__eof", handler__eof, vars->commands, NULL, NULL, NULL);
 
