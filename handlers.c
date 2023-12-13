@@ -56,7 +56,6 @@
 #include "scanroutines.h"
 #include "sets.h"
 #include "show_message.h"
-#include "ptrsx.h"
 
 #define USEPARAMS() ((void) vars, (void) argv, (void) argc)     /* macro to hide gcc unused warnings */
 
@@ -1475,79 +1474,5 @@ bool handler__option(globals_t * vars, char **argv, unsigned argc)
 		show_error("unknown option specified.\n");
 		return false;
 	}
-	return true;
-}
-
-bool handler__create_pointer_map(globals_t * vars, char **argv, unsigned argc)
-{
-	if (argc != 3)
-	{
-		show_error("bad arguments.\n");
-		return false;
-	}
-
-	Pid pid = vars->target;
-	PointerSearcherX *ptr = ptrsx_init();
-
-	// TODO: maybe there should be a default file_path
-	// storage file_path to globals_t ?
-	const char *info_file_path = argv[1];
-	const char *bin_file_path = argv[2];
-
-	int ret = create_pointer_map_file(ptr, pid, true, info_file_path, bin_file_path);
-	if (ret != 0) {
-		const char *error = get_last_error(ptr);
-		show_error("%s\n", error);
-		return false;
-	}
-
-	ptrsx_free(ptr);
-
-	return true;
-}
-
-bool handler__scan_pointer_chain(globals_t * vars, char **argv, unsigned argc)
-{
-	if (argc != 9) 
-	{
-		show_error("bad arguments.\n");
-		return false;
-	}
-
-	PointerSearcherX *ptr = ptrsx_init();
-
-	// TODO: get file_path from globals_t?
-	const char *info_file_path = argv[1];
-	const char *bin_file_path = argv[2];
-
-	int ret = load_pointer_map_file(ptr, bin_file_path, info_file_path);
-	if (ret != 0) {
-		const char *error = get_last_error(ptr);
-		show_error("%s\n", error);
-		return false;
-	}
-
-	// TODO: the user should be allowed to select some modules
-	ModuleList modules = get_modules_info(ptr);
-
-	size_t target_address = strtoull(argv[3], NULL, 16);
-	size_t depth = strtoull(argv[4], NULL, 10);
-	size_t node = strtoull(argv[5], NULL, 10);
-	size_t rangeL = strtoull(argv[6], NULL, 10);
-	size_t rangeR = strtoull(argv[7], NULL, 10);
-
-	struct Params param = {target_address, depth, node, rangeL, rangeR};
-
-	const char *out_file_path = argv[8];
-
-	ret = scanner_pointer_chain(ptr, modules, param, out_file_path);
-	if (ret != 0) {
-		const char *error = get_last_error(ptr);
-		show_error("%s\n", error);
-		return false;
-	}
-
-	ptrsx_free(ptr);
-	
 	return true;
 }

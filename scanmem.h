@@ -35,6 +35,7 @@
 #include "maps.h"
 #include "value.h"
 #include "targetmem.h"
+#include "ptrsx.h"
 
 /* global settings */
 typedef struct {
@@ -61,6 +62,10 @@ typedef struct {
 		unsigned short dump_with_ascii;
 		unsigned short reverse_endianness;
 	} options;
+	struct {
+		PointerSearcherX *ptrsx;
+		const char *cache_dir;
+	};
 } globals_t;
 
 /* global settings */
@@ -89,5 +94,10 @@ bool sm_searchregions(globals_t *vars, scan_match_type_t match_type, const userv
 bool sm_setaddr(pid_t target, void *addr, const value_t *to);
 bool sm_read_array(pid_t target, const void *addr, void *buf, size_t len);
 bool sm_write_array(pid_t target, void *addr, const void *data, size_t len);
+
+/* pointer scan */
+bool sm_create_pointer_map(void);
+ModuleList sm_get_modules_info();
+bool sm_scan_pointer_chain(struct ModuleList modules, Params param, const char *file_path);
 
 #endif /* SCANMEM_H */

@@ -323,8 +323,4 @@ bool handler__write(globals_t *vars, char **argv, unsigned argc);
 
 bool handler__option(globals_t *vars, char **argv, unsigned argc);
 
-bool handler__create_pointer_map(globals_t * vars, char **argv, unsigned argc);
-
-bool handler__scan_pointer_chain(globals_t * vars, char **argv, unsigned argc);
-
 #endif /* HANDLERS_H */

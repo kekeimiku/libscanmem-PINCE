@@ -34,11 +34,13 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <pwd.h>
 
 #include "scanmem.h"
 #include "commands.h"
 #include "handlers.h"
 #include "show_message.h"
+#include "common.h"
 
 /* global settings */
 globals_t sm_globals = {
@@ -99,10 +101,50 @@ out:
 	_exit(EXIT_FAILURE);   /* also detaches from tracee */
 }
 
+static inline char *get_cache_dir(void)
+{
+    /*
+     * Try to find our config folder in order:
+     * - XDG cache dir
+     * - $HOME/.cache
+     * - <system-given home>/.cache
+     *
+     * In normal cases the dir will end up being: $HOME/.cache/scanmem
+     */
+
+    char *sm_cache_dir;
+
+    const char *cache_dir = util_getenv("XDG_CACHE_HOME");
+    if (cache_dir == NULL) {
+        const char *home_dir = util_getenv("HOME");
+        if (home_dir == NULL) {
+            home_dir = getpwuid(getuid())->pw_dir;
+        }
+
+        size_t sm_config_dir_len = strlen(home_dir) + strlen("/.cache/scanmem") + 1;
+        sm_cache_dir = malloc(sm_config_dir_len * sizeof(char));
+        if (sm_cache_dir == NULL)
+            return NULL;
+        snprintf(sm_cache_dir, sm_config_dir_len, "%s/.cache/scanmem", home_dir);
+    }
+    else {
+        size_t sm_config_dir_len = strlen(cache_dir) + strlen("/scanmem") + 1;
+        sm_cache_dir = malloc(sm_config_dir_len * sizeof(char));
+        if (sm_cache_dir == NULL)
+            return NULL;
+        snprintf(sm_cache_dir, sm_config_dir_len, "%s/scanmem", cache_dir);
+    }
+
+    return sm_cache_dir;
+}
+
 /* scanmem general */
 bool sm_init(void){
 	globals_t *vars = &sm_globals;
 	TAILQ_INIT(&vars->match_history);
+	vars->cache_dir = get_cache_dir();
+	vars->ptrsx = ptrsx_init();
+
 	/* before attaching to target, install signal handler to detach on error */
 	if (vars->options.debug == 0){ /* in debug mode, let it crash and see the core dump */
 		(void) signal(SIGHUP, sighandler);
@@ -169,10 +211,6 @@ bool sm_init(void){
 			WRITE_LONGDOC, WRITE_COMPLETE);
 	sm_registercommand("option", handler__option, vars->commands, OPTION_SHRTDOC,
 			OPTION_LONGDOC, OPTION_COMPLETE);
-	sm_registercommand("create_pointer_map", handler__create_pointer_map, vars->commands, NULL,
-			NULL, NULL);
-	sm_registercommand("scan_pointer_chain", handler__scan_pointer_chain, vars->commands, NULL,
-			NULL, NULL);
 	/* commands beginning with __ have special meaning */
 	sm_registercommand("__eof", handler__eof, vars->commands, NULL, NULL, NULL);
 
@@ -283,6 +321,10 @@ bool sm_cmd_reset(void){
 		cur = next;
 	}
 	TAILQ_INIT(&sm_globals.match_history);
+
+	ptrsx_free(sm_globals.ptrsx);
+	sm_globals.ptrsx = ptrsx_init();
+
 	return true;
 }
 
@@ -346,3 +388,66 @@ bool sm_cmd_redo(void){
 	return true;
 }
 
+bool sm_create_pointer_map(void)
+{	
+	show_info("create_pointer_map_file...\n");
+
+	pid_t pid = sm_globals.target;
+
+	char *info_file_path = (char *) malloc(200);
+    sprintf(info_file_path, "%s/%d.txt", sm_globals.cache_dir, pid);
+
+    char *bin_file_path = (char *) malloc(200);
+    sprintf(bin_file_path, "%s/%d.bin", sm_globals.cache_dir, pid);
+
+	int ret = create_pointer_map_file(sm_globals.ptrsx, pid, true, info_file_path, bin_file_path);
+	if (ret != 0) {
+		const char *error = get_last_error(sm_globals.ptrsx);
+		show_error("%s\n", error);
+		return false;
+	}
+
+	show_info("create_pointer_map_file ok.\n");
+    show_info("info_file_path: %s\n", info_file_path);
+    show_info("bin_file_path: %s\n", bin_file_path);
+
+	free(info_file_path);
+	free(bin_file_path);
+
+	return true;
+}
+
+ModuleList sm_get_modules_info()
+{
+	return get_modules_info(sm_globals.ptrsx);
+}
+
+bool sm_scan_pointer_chain(struct ModuleList modules, Params param, const char *file_path)
+{
+	char *info_file_path = (char *) malloc(200);
+    sprintf(info_file_path, "%s/%d.txt", sm_globals.cache_dir, sm_globals.target);
+
+    char *bin_file_path = (char *) malloc(200);
+    sprintf(bin_file_path, "%s/%d.bin", sm_globals.cache_dir, sm_globals.target);
+
+	int ret = load_pointer_map_file(sm_globals.ptrsx, bin_file_path, info_file_path);
+	if (ret != 0) {
+		const char *error = get_last_error(sm_globals.ptrsx);
+		show_error("%s\n", error);
+		return false;
+	}
+
+	ret = scanner_pointer_chain(sm_globals.ptrsx, modules, param, file_path);
+	if (ret != 0) {
+		const char *error = get_last_error(sm_globals.ptrsx);
+		show_error("%s\n", error);
+		return false;
+	}
+
+	show_info("file_path: %s\n", file_path);
+
+	free(info_file_path);
+	free(bin_file_path);
+	
+	return true;
+}

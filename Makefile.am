@@ -24,7 +24,8 @@ libscanmem_la_include_HEADERS = commands.h \
     sets.h \
     show_message.h \
     targetmem.h \
-    value.h
+    value.h \
+    ptrsx.h
 
 libscanmem_la_SOURCES = commands.c \
     procmem.c \
@@ -40,6 +41,7 @@ libscanmem_la_SOURCES = commands.c \
 libscanmem_la_LIBADD = libutil.la
 
 libscanmem_la_LDFLAGS = -version-info 1:0:0 \
+                        -L./ -lptrsx \
                         -export-symbols-regex '^sm_'
 
 # Misc
